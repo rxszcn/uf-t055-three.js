@@ -198,6 +198,87 @@ export default QUnit.module( 'Addons', () => {
 
 				} );
 
+				const getGroupedGeometry = ( indexed, triangleCount ) => {
+
+					const geometry = new BufferGeometry();
+
+					geometry.setAttribute( 'position', new BufferAttribute( new Float32Array( triangleCount * 9 ), 3 ) );
+
+					if ( indexed ) {
+
+						const indices = [];
+						for ( let i = 0; i < triangleCount * 3; i ++ ) indices.push( i );
+						geometry.setIndex( indices );
+
+					}
+
+					return geometry;
+
+				};
+
+				for ( const indexed of [ true, false ] ) {
+
+					const label = indexed ? 'indexed' : 'non-indexed';
+
+					QUnit.test( `preserves existing groups without useGroups (${label})`, ( assert ) => {
+
+						const geometry1 = getGroupedGeometry( indexed, 2 );
+						geometry1.addGroup( 0, 3, 0 );
+						geometry1.addGroup( 3, 3, 1 );
+
+						const geometry2 = getGroupedGeometry( indexed, 1 );
+						geometry2.addGroup( 0, 3, 2 );
+
+						const geometry3 = getGroupedGeometry( indexed, 2 ); // no groups
+
+						const merged = BufferGeometryUtils.mergeGeometries( [ geometry1, geometry2, geometry3 ] );
+
+						assert.deepEqual( merged.groups, [
+							{ start: 0, count: 3, materialIndex: 0 },
+							{ start: 3, count: 3, materialIndex: 1 },
+							{ start: 6, count: 3, materialIndex: 2 }
+						], 'groups are shifted by the concatenated position, material indices are kept' );
+
+					} );
+
+					QUnit.test( `remaps existing group material indices with useGroups (${label})`, ( assert ) => {
+
+						const geometry1 = getGroupedGeometry( indexed, 2 );
+						geometry1.addGroup( 0, 3, 0 );
+						geometry1.addGroup( 3, 3, 1 );
+
+						const geometry2 = getGroupedGeometry( indexed, 1 );
+						geometry2.addGroup( 0, 3, 2 );
+
+						const geometry3 = getGroupedGeometry( indexed, 2 ); // no groups
+
+						const merged = BufferGeometryUtils.mergeGeometries( [ geometry1, geometry2, geometry3 ], true );
+
+						assert.deepEqual( merged.groups, [
+							{ start: 0, count: 3, materialIndex: 0 },
+							{ start: 3, count: 3, materialIndex: 1 },
+							{ start: 6, count: 3, materialIndex: 4 },
+							{ start: 9, count: 6, materialIndex: 5 }
+						], 'material indices are remapped so each geometry follows the previous ones' );
+
+					} );
+
+					QUnit.test( `assigns sequential material indices to group-less geometries with useGroups (${label})`, ( assert ) => {
+
+						const geometry1 = getGroupedGeometry( indexed, 2 );
+						const geometry2 = getGroupedGeometry( indexed, 1 );
+
+						const merged = BufferGeometryUtils.mergeGeometries( [ geometry1, geometry2 ], true );
+
+						assert.deepEqual( merged.groups, [
+							{ start: 0, count: 6, materialIndex: 0 },
+							{ start: 6, count: 3, materialIndex: 1 }
+						], 'one group per geometry, matching the previous behavior' );
+
+					} );
+
+				}
+
 			} );
 
 			QUnit.module( 'mergeVertices', () => {

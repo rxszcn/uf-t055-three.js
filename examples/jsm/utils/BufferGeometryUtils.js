@@ -150,6 +150,12 @@ function computeMikkTSpaceTangents( geometry, MikkTSpace, negateSign = true ) {
 /**
  * Merges a set of geometries into a single instance. All geometries must have compatible attributes.
  *
+ * Existing {@link BufferGeometry#groups} of the input geometries are always preserved by
+ * shifting their `start` to the concatenated position. When `useGroups` is `true`, the
+ * `materialIndex` of existing groups is additionally remapped so that each geometry's
+ * materials are appended after the materials of the previous geometries, and geometries
+ * without groups receive a single group covering their entire range.
+ *
  * @param {Array<BufferGeometry>} geometries - The geometries to merge.
  * @param {boolean} [useGroups=false] - Whether to use groups or not.
  * @return {?BufferGeometry} The merged geometry. Returns `null` if the merge does not succeed.
@@ -169,7 +175,12 @@ function mergeGeometries( geometries, useGroups = false ) {
 	const mergedGeometry = new BufferGeometry();
 	mergedGeometry.morphTargetsRelative = morphTargetsRelative;
 
+	// group offsets must be tracked whenever groups are generated or preserved
+
+	const trackGroups = useGroups || geometries.some( geometry => geometry.groups.length > 0 );
+
 	let offset = 0;
+	let materialOffset = 0;
 
 	for ( let i = 0; i < geometries.length; ++ i ) {
 
@@ -256,7 +267,7 @@ function mergeGeometries( geometries, useGroups = false ) {
 
 		}
 
-		if ( useGroups ) {
+		if ( trackGroups ) {
 
 			let count;
 
@@ -275,7 +286,48 @@ function mergeGeometries( geometries, useGroups = false ) {
 
 			}
 
-			mergedGeometry.addGroup( offset, count, i );
+			if ( useGroups ) {
+
+				if ( geometry.groups.length > 0 ) {
+
+					// preserve the existing groups and remap their material indices
+					// so each geometry's materials follow the previous geometries' ones
+
+					let maxMaterialIndex = 0;
+
+					for ( let j = 0; j < geometry.groups.length; ++ j ) {
+
+						const group = geometry.groups[ j ];
+
+						mergedGeometry.addGroup( offset + group.start, group.count, materialOffset + group.materialIndex );
+
+						maxMaterialIndex = Math.max( maxMaterialIndex, group.materialIndex );
+
+					}
+
+					materialOffset += maxMaterialIndex + 1;
+
+				} else {
+
+					mergedGeometry.addGroup( offset, count, materialOffset );
+
+					materialOffset += 1;
+
+				}
+
+			} else {
+
+				// preserve the existing groups, shifted to the concatenated position
+
+				for ( let j = 0; j < geometry.groups.length; ++ j ) {
+
+					const group = geometry.groups[ j ];
+
+					mergedGeometry.addGroup( offset + group.start, group.count, group.materialIndex );
+
+				}
+
+			}
 
 			offset += count;
 

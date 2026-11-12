@@ -237,7 +237,11 @@ Instances of <a href="InterleavedBufferAttribute.html">InterleavedBufferAttribut
 										<strong translate="no">useGroups</strong>
 									</td>
 									<td class="description last">
-										<p>Whether to use groups or not.</p>
+										<p>Whether to use groups or not. Existing groups of the input geometries are always
+										preserved, shifted to the concatenated position. When enabled, the material indices
+										of existing groups are remapped so that each geometry's materials follow the
+										materials of the previous geometries, and geometries without groups receive a
+										single group covering their entire range.</p>
 										<p>Default is <code>false</code>.</p>
 									</td>
 								</tr>
